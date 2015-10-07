@@ -2,3 +2,5 @@
   - use_database now returns the value returned by the yielded block, e.g.
     users = use_database('test') { |db| db.execute('select * from users') }
   - fixed *-queries with multiple table names
+  - An exception is raised now if ambiguous column names are part of a
+    result while using `return_format: :hash`
