@@ -34,7 +34,6 @@ describe SQLiteWrapper::Connector do
           context 'with ambiguous column names' do
             it 'raises an exception' do
               use_database('test', :return_format => 'hash') do |db|
-                db.execute(query)
                 expect { db.execute(query) }.to raise_error SQLiteWrapper::AmbiguousColumnNameError
               end
             end

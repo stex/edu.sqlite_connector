@@ -229,9 +229,16 @@ module SQLiteWrapper
   # on the query to be executed
   #
   class ResultSet
+
+    GLOBAL_SELECT_FUNCTIONS = %w(last_insert_rowid).freeze
+    R_GLOBAL_FUNCTION = "(#{GLOBAL_SELECT_FUNCTIONS.map { |f| f + '\(\)'}.join('|') })"
+    R_FROM_OR_GLOBAL  = "(from|#{GLOBAL_SELECT_FUNCTIONS.join('|')})"
+    R_SELECT_QUERY    = "^select.*#{R_FROM_OR_GLOBAL}"
+    R_COUNT           = 'count\((.+)\)'
+
     def initialize(query, database, options)
       @options  = options
-      @query    = query
+      @query    = sanitize_query(query)
       @database = database
     end
 
@@ -240,6 +247,20 @@ module SQLiteWrapper
     end
 
     private
+
+    #
+    # @return [Regexp] a regular expression based on the given constant
+    #
+    def regexp(name)
+      Regexp.new(ResultSet.const_get("r_#{name}".upcase.to_sym), 'i')
+    end
+
+    #
+    # Removes newlines from queries
+    #
+    def sanitize_query(query)
+      query.gsub(/[\r\n]/, ' ').gsub(/[ ]{2,}/, ' ').strip
+    end
 
     #
     # Tries to execute the given +@query+
@@ -285,7 +306,7 @@ module SQLiteWrapper
     #   +true+ if the query is a select query
     #
     def select_query?
-      !!(@query.downcase =~ /^select.*from/)
+      !!(@query =~ regexp(:select_query))
     end
 
     #
@@ -327,14 +348,20 @@ module SQLiteWrapper
     #     :aliases => Used aliases as Hashes
     #
     def select_information
-      simple_query       = /select\s+(.*)\s+from\s+(.*);/i
-      complex_query      = /select\s+(.*)\s+from\s+(.*)\s+(where|order)\s+(.*);/i
-      simple_join_query  = /select\s+(.*)\s+from\s+(.*)\s+inner join\s+(.*)\s+on\s+.*;/i
-      complex_join_query = /select\s+(.*)\s+from\s+(.*)\s+inner join\s+(.*)\s+on\s+.*(where|order)\s+(.*);/i
+      global_function_query = Regexp.new("select\s+#{regexp(:global_function)}(.*);", 'i')
+      simple_query          = /select\s+(.*)\s+from\s+(.*);/i
+      complex_query         = /select\s+(.*)\s+from\s+(.*)\s+(where|order)\s+(.*);/i
+      simple_join_query     = /select\s+(.*)\s+from\s+(.*)\s+inner join\s+(.*)\s+on\s+.*;/i
+      complex_join_query    = /select\s+(.*)\s+from\s+(.*)\s+inner join\s+(.*)\s+on\s+.*(where|order)\s+(.*);/i
 
       m1 = complex_join_query.match(@query)
       m2 = simple_join_query.match(@query)
+      mg = global_function_query.match(@query)
       m  = m1 || m2 || complex_query.match(@query) || simple_query.match(@query)
+
+      if mg
+        fail 'Global functions are currently not supported.'
+      end
 
       if m
         aliases     = {}
@@ -419,6 +446,10 @@ module SQLiteWrapper
             raise_table_not_found(table)
           end
         end
+      # format: count(...)
+      elsif m = column_string.match(regexp(:count))
+        [infer_table_and_column(m[1], tables).first, column_string]
+      # format: column
       elsif t = tables.select { |t| table_has_column?(t, column_string) }.first
         [t, column_string]
       else
@@ -439,7 +470,12 @@ module SQLiteWrapper
     #    sql_type("users", "name") #=> "VARCHAR(255)"
     #
     def sql_type(table, column)
-      column_info(table, column)['type']
+      case column
+        when regexp(:count)
+          'INTEGER'
+        else
+          column_info(table, column)['type']
+      end
     end
 
     #
