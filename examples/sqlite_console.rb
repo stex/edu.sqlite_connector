@@ -12,15 +12,19 @@ use_database("veranst") do |db|
   while command != ".quit" do
     print("sqlite> ")
     command = gets.chop
-    if command != ".quit" then
-      table = db.execute(command)
-      for i in 0..table.size-1 do
-        for j in 0..table[i].size-2 do
-          print(table[i][j].to_s+"|");
+    begin
+      if command != ".quit" then
+        table = db.execute(command)
+        for i in 0..table.size-1 do
+          for j in 0..table[i].size-2 do
+            print(table[i][j].to_s+"|");
+          end
+          puts(table[i][table[i].size-1].to_s)
         end
-        puts(table[i][table[i].size-1].to_s)
+        puts table.size.to_s + " Zeilen zurückgegeben."
       end
-      puts table.size.to_s + " Zeilen zurückgegeben."
+    rescue Exception => e
+      puts "Ungültige Eingabe: " + e.message.red
     end
   end
 end
