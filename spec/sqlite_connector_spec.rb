@@ -26,6 +26,25 @@ describe SQLiteWrapper::Connector do
   end
 
   describe '#execute' do
+    context 'when given a select query' do
+      context 'with table aliases' do
+        let(:query) { 'select u.name from users u;' }
+
+        it 'does not thrown an exception' do
+          use_database('test', :return_format => 'hash') do |db|
+            expect { db.execute(query) }.not_to raise_exception
+          end
+        end
+
+        it 'names the resulting columns correctly' do
+          use_database('test', :return_format => 'hash') do |db|
+            expect(db.execute(query)).to all include('name')
+          end
+        end
+      end
+    end
+
+
     context 'when inserting a multiline text' do
       let(:insert_query) { "INSERT INTO users (id, name) VALUES(3, 'I\nam\nGroot!');" }
       let(:select_query) { 'SELECT * FROM users WHERE id = 3;' }

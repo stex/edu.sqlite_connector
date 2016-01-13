@@ -240,6 +240,7 @@ module SQLiteWrapper
       @options  = options
       @query    = query.strip
       @database = database
+      @table_aliases = {}
     end
 
     def to_a
@@ -318,6 +319,13 @@ module SQLiteWrapper
     end
 
     #
+    # @return [String] the name a table is aliased as (if any)
+    #
+    def dealiased_table_name(table)
+      table =~ /(.*) (.*)/ ? @table_aliases[$2] : @table_aliases[table] || table
+    end
+
+    #
     # Gathers all necessary information from insert queries
     #
     # @return [Hash]
@@ -374,9 +382,13 @@ module SQLiteWrapper
         end
 
         table_names.each do |t|
-          unless table_exists?(t)
-            raise_table_not_found(t)
+          if t =~ /(.*) (.*)/
+            @table_aliases[$2] = $1
           end
+        end
+
+        table_names.each do |t|
+          raise_table_not_found(dealiased_table_name(t)) unless table_exists?(dealiased_table_name(t))
         end
 
         column_names = []
@@ -438,7 +450,7 @@ module SQLiteWrapper
     def infer_table_and_column(column_string, tables)
       #format: table.column
       if m = column_string.match(/^([a-zA-Z_]+)\.([a-zA-Z_]+)$/i)
-        table, column = m[1], m[2]
+        table, column = dealiased_table_name(m[1]), m[2]
         if table_has_column?(table, column)
           [table, column]
         else
