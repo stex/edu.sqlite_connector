@@ -238,7 +238,7 @@ module SQLiteWrapper
 
     def initialize(query, database, options)
       @options  = options
-      @query    = sanitize_query(query)
+      @query    = query.strip
       @database = database
     end
 
@@ -348,16 +348,18 @@ module SQLiteWrapper
     #     :aliases => Used aliases as Hashes
     #
     def select_information
+      sanitized_query = sanitize_query(@query)
+
       global_function_query = Regexp.new("select\s+#{regexp(:global_function)}(.*);", 'i')
       simple_query          = /select\s+(.*)\s+from\s+(.*);/i
       complex_query         = /select\s+(.*)\s+from\s+(.*)\s+(where|order)\s+(.*);/i
       simple_join_query     = /select\s+(.*)\s+from\s+(.*)\s+inner join\s+(.*)\s+on\s+.*;/i
       complex_join_query    = /select\s+(.*)\s+from\s+(.*)\s+inner join\s+(.*)\s+on\s+.*(where|order)\s+(.*);/i
 
-      m1 = complex_join_query.match(@query)
-      m2 = simple_join_query.match(@query)
-      mg = global_function_query.match(@query)
-      m  = m1 || m2 || complex_query.match(@query) || simple_query.match(@query)
+      m1 = complex_join_query.match(sanitized_query)
+      m2 = simple_join_query.match(sanitized_query)
+      mg = global_function_query.match(sanitized_query)
+      m  = m1 || m2 || complex_query.match(sanitized_query) || simple_query.match(sanitized_query)
 
       if mg
         fail 'Global functions are currently not supported.'

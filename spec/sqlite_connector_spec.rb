@@ -1,28 +1,54 @@
 require_relative '../sqlite_connector'
 
-describe '#use_database' do
+describe SQLiteWrapper::Connector do
+
   let(:database_file) { File.join(File.dirname(__FILE__), 'test.sqlite3') }
+
+  before(:each) do
+    use_database('test') do |db|
+      db.execute('CREATE TABLE users(id INTEGER, name TEXT);')
+      db.execute('CREATE TABLE posts(id INTEGER, content TEXT);')
+      db.execute('INSERT INTO users (id, name) VALUES (1, "Charlie Brown");')
+      db.execute('INSERT INTO users (id, name) VALUES (2, "Snoopy");')
+      db.execute('INSERT INTO posts (id, content) VALUES (1, "Worf Worf");')
+    end
+  end
 
   after(:each) do
     File.unlink(database_file)
   end
 
-  it "returns the yielded block's return value" do
-    result = use_database('test') { 'something' }
-    expect(result).to eql 'something'
+  describe '#use_database' do
+    it "returns the yielded block's return value" do
+      result = use_database('test') { 'something' }
+      expect(result).to eql 'something'
+    end
   end
-end
-
-describe SQLiteWrapper::Connector do
 
   describe '#execute' do
-    before(:all) do
-      use_database('test') do |db|
-        db.execute('CREATE TABLE users(id INTEGER, name TEXT);')
-        db.execute('CREATE TABLE posts(id INTEGER, content TEXT);')
-        db.execute('INSERT INTO users (id, name) VALUES (1, "Charlie Brown");')
-        db.execute('INSERT INTO users (id, name) VALUES (2, "Snoopy");')
-        db.execute('INSERT INTO posts (id, content) VALUES (1, "Worf Worf");')
+    context 'when inserting a multiline text' do
+      let(:insert_query) { "INSERT INTO users (id, name) VALUES(3, 'I\nam\nGroot!');" }
+      let(:select_query) { 'SELECT * FROM users WHERE id = 3;' }
+
+      it 'actually inserts the newlines' do
+        use_database('test', :return_format => 'hash') do |db|
+          db.execute(insert_query)
+          expect(db.execute(select_query)).to have(1).item
+          expect(db.execute(select_query).first).to include('name' => "I\nam\nGroot!")
+        end
+      end
+    end
+
+    context 'when inserting a text with multiple spaces' do
+      let(:insert_query) { "INSERT INTO users (id, name) VALUES(3, 'I   am    Groot!');" }
+      let(:select_query) { 'SELECT * FROM users WHERE id = 3;' }
+
+      it 'actually inserts the spaces' do
+        use_database('test', :return_format => 'hash') do |db|
+          db.execute(insert_query)
+          expect(db.execute(select_query)).to have(1).item
+          expect(db.execute(select_query).first).to include('name' => 'I   am    Groot!')
+        end
       end
     end
 
@@ -60,8 +86,6 @@ describe SQLiteWrapper::Connector do
           end
         end
       end
-
     end
   end
-
 end
