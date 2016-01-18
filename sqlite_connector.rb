@@ -235,6 +235,7 @@ module SQLiteWrapper
     R_FROM_OR_GLOBAL  = "(from|#{GLOBAL_SELECT_FUNCTIONS.join('|')})"
     R_SELECT_QUERY    = "^select.*#{R_FROM_OR_GLOBAL}"
     R_COUNT           = 'count\((.+)\)'
+    R_TABLE_ALIAS     = '([^ ]+)(\s+as\s*)? (.+)'
 
     def initialize(query, database, options)
       @options  = options
@@ -322,7 +323,7 @@ module SQLiteWrapper
     # @return [String] the name a table is aliased as (if any)
     #
     def dealiased_table_name(table)
-      table =~ /(.*) (.*)/ ? @table_aliases[$2] : @table_aliases[table] || table
+      table =~ regexp(:table_alias) ? @table_aliases[$3] : @table_aliases[table] || table
     end
 
     #
@@ -382,8 +383,8 @@ module SQLiteWrapper
         end
 
         table_names.each do |t|
-          if t =~ /(.*) (.*)/
-            @table_aliases[$2] = $1
+          if t =~ regexp(:table_alias)
+            @table_aliases[$3] = $1
           end
         end
 
@@ -528,7 +529,7 @@ module SQLiteWrapper
     #   Each column is returned as a hash containing its properties.
     #
     def table_info(table)
-      @database.table_info(table)
+      @database.table_info(dealiased_table_name(table))
     end
 
     #

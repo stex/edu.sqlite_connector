@@ -44,7 +44,6 @@ describe SQLiteWrapper::Connector do
       end
     end
 
-
     context 'when inserting a multiline text' do
       let(:insert_query) { "INSERT INTO users (id, name) VALUES(3, 'I\nam\nGroot!');" }
       let(:select_query) { 'SELECT * FROM users WHERE id = 3;' }
