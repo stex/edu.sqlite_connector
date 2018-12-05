@@ -16,8 +16,6 @@
 # how the connector works.
 #
 
-require 'rubygems'
-
 #
 # Extend the String class to support colorized output
 #
@@ -39,12 +37,23 @@ class String
   end
 end
 
+def jruby?
+  RUBY_PLATFORM == 'java'
+end
+
+REQUIRED_GEMS = if jruby?
+                  %w(dbi dbd-jdbc jdbc-sqlite3)
+                else
+                  ['sqlite3']
+                end
+
 #
 # Tries to execute the given command without sudo.
 # If it fails, it re-tries with sudo.
 #
 def try_sudo(command)
-  system("sudo #{command}") unless system(command)
+  return true if system(command)
+  system("sudo #{command}")
 end
 
 #
@@ -52,7 +61,7 @@ end
 # and exits the problem with code 1
 #
 def error_and_exit(reason, prefix = nil)
-  prefix ||= 'Das sqlite3-Gem konnte nicht installiert werden. Bitte wenden Sie ' \
+  prefix ||= "Das #{REQUIRED_GEMS.last}-Gem konnte nicht installiert werden. Bitte wenden Sie " \
              'sich an Ihren Übungsgruppenleiter. Sagen Sie ihm, es lag an '
   puts "#{prefix} #{reason}".red
   exit(1)
@@ -72,14 +81,19 @@ end
 WINDOWS_SOURCES = ['https://rubygems.org', 'https://rubygems.org/']
 
 begin
-  require 'sqlite3'
+  require 'java' if jruby?
+  REQUIRED_GEMS.map { |gem_name| gem_name.gsub('-', '/') }.each(&method(:require))
+
+  if jruby?
+    Jdbc::SQLite3.load_driver
+  end
 rescue LoadError
-  info 'Das sqlite3 gem ist nicht korrekt installiert.'.red
+  info "Das #{REQUIRED_GEMS.last} gem ist nicht korrekt installiert.".red
   if Gem.win_platform?
     info 'Das Programm versucht nun, das Gem selbstständig zu installieren...'
     # Update rubygems version, necessary to communicate over ssl with rubygems.org
     # To achieve this, we have to disable the https source first (...) and re-active it later.
-    WINDOWS_SOURCES.each { |s| system('gem sources --remove #{s}') }
+    WINDOWS_SOURCES.each { |s| system("gem sources --remove #{s}") }
     system('gem sources --add http://rubygems.org/')
 
     if system('gem update --system')
@@ -110,6 +124,14 @@ rescue LoadError
     puts 'Das sqlite3-Gem sollte in OSX eigentlich von Haus aus installiert sein.
           Bitte wenden Sie sich an Ihren Übungsgruppenleiter.'.red
     exit(1)
+  elsif Gem.platforms.last.os =~ /java/
+    REQUIRED_GEMS.each do |gem_name|
+      unless try_sudo("gem install #{gem_name}")
+        error_and_exit "der jRuby Gem-Installation von #{gem_name}."
+      end
+    end
+
+    info 'Das Gem wurde erfolgreich installiert.'
   else
     puts 'Ihr Betriebssystem konnte nicht korrekt erkannt werden. Bitte wenden Sie
           sich an ihren Übungsgruppenleiter.'.red
@@ -207,7 +229,16 @@ module SQLiteWrapper
     end
 
     def open
-      @database = SQLite3::Database.new(@database_path)
+      @database = if jruby?
+                    ::DBI.connect(
+                        "dbi:Jdbc:sqlite:#{@database_path}", # connection string
+                        '', # no username for sqlite3
+                        '', # no password for sqlite3
+                        'driver' => 'org.sqlite.JDBC' # need to set the driver
+                    )
+                  else
+                    SQLite3::Database.new(@database_path)
+                  end
     end
 
     def close

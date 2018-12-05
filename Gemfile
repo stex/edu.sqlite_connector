@@ -2,5 +2,14 @@ source 'https://rubygems.org'
 
 gem 'rspec'
 gem 'rspec-collection_matchers'
-gem 'sqlite3'
-gem 'byebug'
+
+platform :ruby do
+  gem 'sqlite3'
+  gem 'pry'
+  gem 'pry-byebug'
+end
+
+platform :jruby do
+  gem 'ruby-debug'
+  gem 'jdbc-sqlite3'
+end
