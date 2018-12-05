@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-#ENCODING: UTF-8
+# ENCODING: UTF-8
 
 #
 # @version 1.0
@@ -23,18 +23,18 @@ require 'rubygems'
 #
 class String
   def colorize(color_code)
-    ; "\e[#{color_code}m#{self}\e[0m"
+    "\e[#{color_code}m#{self}\e[0m"
   end
 
-  def red;
+  def red
     colorize(31)
   end
 
-  def green;
+  def green
     colorize(32)
   end
 
-  def yellow;
+  def yellow
     colorize(33)
   end
 end
@@ -44,9 +44,7 @@ end
 # If it fails, it re-tries with sudo.
 #
 def try_sudo(command)
-  unless system(command)
-    system("sudo #{command}")
-  end
+  system("sudo #{command}") unless system(command)
 end
 
 #
@@ -54,7 +52,7 @@ end
 # and exits the problem with code 1
 #
 def error_and_exit(reason, prefix = nil)
-  prefix ||= 'Das sqlite3-Gem konnte nicht installiert werden. Bitte wenden Sie '\
+  prefix ||= 'Das sqlite3-Gem konnte nicht installiert werden. Bitte wenden Sie ' \
              'sich an Ihren Übungsgruppenleiter. Sagen Sie ihm, es lag an '
   puts "#{prefix} #{reason}".red
   exit(1)
@@ -79,8 +77,8 @@ rescue LoadError
   info 'Das sqlite3 gem ist nicht korrekt installiert.'.red
   if Gem.win_platform?
     info 'Das Programm versucht nun, das Gem selbstständig zu installieren...'
-    #Update rubygems version, necessary to communicate over ssl with rubygems.org
-    #To achieve this, we have to disable the https source first (...) and re-active it later.
+    # Update rubygems version, necessary to communicate over ssl with rubygems.org
+    # To achieve this, we have to disable the https source first (...) and re-active it later.
     WINDOWS_SOURCES.each { |s| system('gem sources --remove #{s}') }
     system('gem sources --add http://rubygems.org/')
 
@@ -229,9 +227,8 @@ module SQLiteWrapper
   # on the query to be executed
   #
   class ResultSet
-
     GLOBAL_SELECT_FUNCTIONS = %w(last_insert_rowid).freeze
-    R_GLOBAL_FUNCTION = "(#{GLOBAL_SELECT_FUNCTIONS.map { |f| f + '\(\)'}.join('|') })"
+    R_GLOBAL_FUNCTION = "(#{GLOBAL_SELECT_FUNCTIONS.map { |f| f + '\(\)' }.join('|')})"
     R_FROM_OR_GLOBAL  = "(from|#{GLOBAL_SELECT_FUNCTIONS.join('|')})"
     R_SELECT_QUERY    = "^select.*#{R_FROM_OR_GLOBAL}"
     R_COUNT           = 'count\((.+)\)'
@@ -272,14 +269,14 @@ module SQLiteWrapper
     #                 original SQL types and not the basic SQLite types
     #
     def execute
-      #Raise an exception if the query does not end with a semicolon
+      # Raise an exception if the query does not end with a semicolon
       unless @query.strip =~ /;$/
         raise BadCodingStyleError.new('Missing semicolon at end of line in query '.red + @query.yellow)
       end
 
       unless @result
         select_information if select_query?
-        #insert_information if insert_query?
+        # insert_information if insert_query?
 
         begin
           @result = @database.execute2(@query)
@@ -334,9 +331,9 @@ module SQLiteWrapper
     #
     def insert_information
       if m = @query.match(/^insert into ([a-zA-Z]+) \((([a-zA-Z]+,? ?)+)\) values \((([a-zA-Z'"0-9]+,? ?)+)\)/i)
-        {:table_name   => m[1],
-         :column_names => split_n_strip(m[2]),
-         :values       => split_n_strip(m[4])}
+        { :table_name => m[1],
+          :column_names => split_n_strip(m[2]),
+          :values => split_n_strip(m[4]) }
       else
         {}
       end
@@ -394,29 +391,29 @@ module SQLiteWrapper
 
         column_names = []
         split_n_strip(m[1]).each do |cn|
-          #Format: "table_name.column_name"
+          # Format: "table_name.column_name"
           if cm = cn.match(/(.*) as (.*)/i)
             column_names << infer_table_and_column(cm[1], table_names)
             aliases[cm[2]] = cm[1]
-            #Format: "*"
+            # Format: "*"
           elsif cn == '*'
             table_names.each do |table|
               table_column_names(table).map do |c|
                 column_names << [table, c]
               end
             end
-            #Format: "table_name.*"
+            # Format: "table_name.*"
           elsif cm = cn.match(/^([a-zA-Z_]+)\.\*/)
             table_column_names(cm[1]).map do |c|
               column_names << [cm[1], c]
             end
-            #Format: "column_name" (hopefully)
+            # Format: "column_name" (hopefully)
           else
             column_names << infer_table_and_column(cn, table_names)
           end
         end
 
-        {:tables => table_names, :columns => column_names, :aliases => aliases}
+        { :tables => table_names, :columns => column_names, :aliases => aliases }
       else
         {}
       end
@@ -449,7 +446,7 @@ module SQLiteWrapper
     #   Raised if the given table does not exist in the database
     #
     def infer_table_and_column(column_string, tables)
-      #format: table.column
+      # format: table.column
       if m = column_string.match(/^([a-zA-Z_]+)\.([a-zA-Z_]+)$/i)
         table, column = dealiased_table_name(m[1]), m[2]
         if table_has_column?(table, column)
@@ -486,10 +483,10 @@ module SQLiteWrapper
     #
     def sql_type(table, column)
       case column
-        when regexp(:count)
-          'INTEGER'
-        else
-          column_info(table, column)['type']
+      when regexp(:count)
+        'INTEGER'
+      else
+        column_info(table, column)['type']
       end
     end
 
@@ -572,18 +569,18 @@ module SQLiteWrapper
     #
     def format_select_results(results)
       case @options[:return_format]
-        when 'hash'
-          results.map do |row|
-            row.each_with_object({}).with_index do |(v, hash), idx|
-              if hash.has_key?(@columns[idx])
-                fail AmbiguousColumnNameError, "Multiple columns named '#{@columns[idx]}' are part of the " \
-                                               "results which is not permitted when using `:return_format => 'hash'`"
-              end
-              hash[@columns[idx]] = v
+      when 'hash'
+        results.map do |row|
+          row.each_with_object({}).with_index do |(v, hash), idx|
+            if hash.has_key?(@columns[idx])
+              fail AmbiguousColumnNameError, "Multiple columns named '#{@columns[idx]}' are part of the " \
+                                             "results which is not permitted when using `:return_format => 'hash'`"
             end
+            hash[@columns[idx]] = v
           end
-        else
-          results
+        end
+      else
+        results
       end
     end
 
